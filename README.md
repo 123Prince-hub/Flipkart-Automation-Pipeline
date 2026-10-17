@@ -158,9 +158,7 @@ Flipkart_Automation/
 ├── main.py                     # Main automation script orchestrating the full 6-step workflow
 ├── utils.py                    # DOM specification parser, link extractor, & UI helpers
 ├── requirements.txt            # Python dependencies (Selenium, Pandas, OpenPyXL, Requests, etc.)
-├── rules.md                    # Assignment rules and requirements specification
 ├── README.md                   # Comprehensive project documentation
-└── flipkart_product_details.xlsx # Sample generated Excel output
 ```
 
 ---
