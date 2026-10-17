@@ -66,7 +66,7 @@ def extract_product_urls(driver, timeout=15):
 
                 // If anchor text is missing or just price, retrieve card title
                 if (!title || title.length < 3 || title.startsWith('₹') || title.includes('% off')) {
-                    const cardTitle = card ? (card.querySelector('div.KzDlHZ, div._4rR01T, a.wByegH, a[class*="IRpwTa"], div[class*="title"], h2')?.innerText || '') : '';
+                    const cardTitle = card ? (card.querySelector('a.wjcEIp, a.WKTcLC, a[title], div.sylWjh, div.KzDlHZ, div._4rR01T, a.wByegH, a[class*="IRpwTa"], div[class*="title"], h2')?.innerText || '') : '';
                     if (cardTitle.trim().length > 3) title = cardTitle.trim().replace(/\s+/g, ' ');
                 }
 
@@ -95,11 +95,14 @@ def extract_flipkart_product(driver, timeout=20):
     Extracts product details from the current Flipkart product page.
     """
     # Wait for page load
-    WebDriverWait(driver, timeout).until(
-        lambda d: d.execute_script("""
-            return document.readyState === 'complete' && document.body && document.body.innerText.length > 100;
-        """)
-    )
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: d.execute_script("""
+                return document.readyState === 'complete' && document.body && document.body.innerText.length > 100;
+            """)
+        )
+    except Exception as wait_err:
+        print(f"[DEBUG] Page load wait notice: {wait_err}")
 
 
     # Scroll smoothly to load lazy sections
@@ -341,6 +344,34 @@ def handle_cart_retry(driver, delay=2):
 
 
 
+def add_to_cart_ui_fallback(driver):
+    """
+    Attempts to click 'Add to Cart' or 'Add to Basket' button directly via browser DOM.
+    Useful for Grocery items, items requiring UI interactions, or when API request is unconfirmed.
+    Returns True if an add button was clicked, False otherwise.
+    """
+    try:
+        clicked = driver.execute_script("""
+            for (const el of document.querySelectorAll('button, a, div[role="button"]')) {
+                const text = (el.innerText || '').trim().toLowerCase();
+                if (text === 'add to cart' || text === 'add to basket' || text.startsWith('add to cart') || text.startsWith('add to basket')) {
+                    try { el.click(); return true; } catch(e) {}
+                }
+            }
+            return false;
+        """)
+        if clicked:
+            print("[INFO] Clicked 'Add to Cart / Basket' via browser UI fallback.")
+            _time.sleep(3)
+            return True
+        return False
+    except Exception as e:
+        print(f"[DEBUG] UI add-to-cart fallback notice: {e}")
+        return False
+
+
+
+
 def extract_cart_total(driver, max_attempts=5, delay=1):
     """
     Extracts the payable Total Amount from the Flipkart Cart (/viewcart) page.
@@ -348,6 +379,15 @@ def extract_cart_total(driver, max_attempts=5, delay=1):
     for attempt_no in range(1, max_attempts + 1):
         try:
             total_amount = driver.execute_script(r"""
+                // Switch to Grocery tab if regular cart is empty and grocery tab has items
+                for (const el of document.querySelectorAll('a, button, div[role="tab"]')) {
+                    const txt = (el.innerText || '').trim().toLowerCase();
+                    if (txt.includes('grocery') && !txt.includes('(0)')) {
+                        try { el.click(); } catch(e) {}
+                        break;
+                    }
+                }
+
                 // 1. Locate element with text 'Total Amount' and inspect sibling/parent
                 for (const el of document.querySelectorAll('*')) {
                     if ((el.innerText || '').trim() === 'Total Amount' && el.children.length === 0) {

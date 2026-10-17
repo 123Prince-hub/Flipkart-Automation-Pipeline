@@ -15,6 +15,7 @@ from utils import (
     extract_flipkart_product,
     handle_cart_retry,
     extract_cart_total,
+    add_to_cart_ui_fallback,
 )
 
 
@@ -68,17 +69,29 @@ def run_flipkart_automation(search_query="laptop"):
             pass
 
         # --- REQUIREMENT 2: Search for a Product ---
-        search_box = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.NAME, "q"))
-        )
+        try:
+            search_box = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.NAME, "q"))
+            )
+        except Exception:
+            search_box = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='text'], input[placeholder*='Search']"))
+            )
+        search_box.clear()
         search_box.send_keys(search_query)
         search_box.send_keys(Keys.RETURN)
         print(f"[INFO] Search query submitted. Waiting for product results...")
 
         # --- REQUIREMENT 3: Select Product & Extract DOM Info ---
-        products = extract_product_urls(driver)
+        try:
+            products = extract_product_urls(driver)
+        except Exception as e:
+            print(f"[WARNING] Product link extraction notice: {e}")
+            products = []
+
         if not products:
-            raise RuntimeError(f"No matching products found for search query: '{search_query}'")
+            print(f"[WARNING] No matching products found for search query: '{search_query}'. Skipping further steps.")
+            return
         products_url_data = products[0]
 
         print(f"[INFO] Opening matching product page...")
@@ -127,14 +140,18 @@ def run_flipkart_automation(search_query="laptop"):
             and product_id and product_id != "N/A"
             and selling_price not in (None, "", "N/A")
         ):
-            # Get cookies from the current Selenium browser session
-            browser_cookies = driver.get_cookies()
-
-            # Transfer applicable cookies to a requests session
-            session = requests.Session()
+            browser_cookies = driver.get_cookies() # Get cookies
+            session = requests.Session()  # Transfer applicable cookies to a requests session
 
             for cookie in browser_cookies:
                 session.cookies.set(cookie["name"], cookie["value"], domain=cookie.get("domain"), path=cookie.get("path", "/"))
+
+            # Safe numeric price parsing (handles floats, commas, currency symbols)
+            try:
+                clean_price = float(str(selling_price).replace("₹", "").replace(",", "").strip())
+                primary_price = int(clean_price)
+            except (ValueError, TypeError):
+                primary_price = 0
 
             payload = {
                 "cartContext": {
@@ -147,10 +164,7 @@ def run_flipkart_automation(search_query="laptop"):
                         "selectedActions": [
                             "ADD_TO_CART"
                         ],
-                        "primaryProductPrice": int(
-                            str(selling_price).replace("₹", "")
-                            .replace(",", "").strip()
-                        )
+                        "primaryProductPrice": primary_price
                     }
                 },
                 "pageType": "ProductPage"
@@ -168,6 +182,7 @@ def run_flipkart_automation(search_query="laptop"):
 
             MAX_RETRIES = 3
             api_response = None
+            response = None
             api_url = "https://1.rome.api.flipkart.com/api/5/cart"
 
             try:
@@ -181,9 +196,9 @@ def run_flipkart_automation(search_query="laptop"):
                         break
 
                     # Handle Flipkart DC Change (406 + ERROR_CODE 2000)
-                    error_code = api_response.get("ERROR_CODE")
-                    if response.status_code == 406 and error_code == 2000:
-                        dc_resp = api_response.get("RESPONSE", {})
+                    error_code = (api_response or {}).get("ERROR_CODE")
+                    if getattr(response, "status_code", None) == 406 and error_code == 2000:
+                        dc_resp = (api_response or {}).get("RESPONSE", {})
                         dc_info = dc_resp.get("dc", "unknown")
                         dc_id = dc_resp.get("id")
                         print(f"[INFO] Flipkart DC Routing detected (DC: {dc_info}). Redirecting to DC endpoint...")
@@ -196,7 +211,7 @@ def run_flipkart_automation(search_query="laptop"):
                     break
 
                 cart_response = (
-                    api_response.get("RESPONSE", {})
+                    (api_response or {}).get("RESPONSE", {})
                     .get("cartResponse", {})
                 )
 
@@ -214,15 +229,18 @@ def run_flipkart_automation(search_query="laptop"):
                             except Exception:
                                 pass
                 else:
-                    status = response.status_code
-                    err_msg = api_response.get("ERROR_MESSAGE", "Unknown error")
+                    status = getattr(response, "status_code", "N/A")
+                    err_msg = (api_response or {}).get("ERROR_MESSAGE", "Unknown error / response")
                     print(
-                        f"[WARNING] Product not confirmed in cart. "
-                        f"HTTP {status} | Error: {err_msg}"
+                        f"[WARNING] Product not confirmed in cart via API (HTTP {status} | Error: {err_msg}). "
+                        "Attempting browser UI fallback..."
                     )
+                    add_to_cart_ui_fallback(driver)
 
             except requests.RequestException as exc:
                 print("[ERROR] Cart API request failed:", str(exc))
+                print("[INFO] Attempting browser UI fallback...")
+                add_to_cart_ui_fallback(driver)
 
             finally:
                 session.close()
@@ -230,8 +248,9 @@ def run_flipkart_automation(search_query="laptop"):
         else:
             print(
                 "[WARNING] Listing ID, Product ID, or Selling Price "
-                "is missing. Skipping Cart API request."
+                "is missing for API. Attempting browser UI fallback..."
             )
+            add_to_cart_ui_fallback(driver)
 
 
         # --- REQUIREMENT 5: Checkout & Cart Verification ---
@@ -271,7 +290,8 @@ def run_flipkart_automation(search_query="laptop"):
             export_df.to_excel(excel_filename, index=False, engine='openpyxl')
             print(f"[SUCCESS] All 6 required fields saved to '{excel_filename}'")
         except PermissionError:
-            backup_file = "flipkart_product_details_backup.xlsx"
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_file = f"flipkart_product_details_{timestamp}.xlsx"
             export_df.to_excel(backup_file, index=False, engine='openpyxl')
             print(f"[WARNING] '{excel_filename}' is locked or open in Excel. Saved successfully to backup file: '{backup_file}'")
         except Exception as ex:
