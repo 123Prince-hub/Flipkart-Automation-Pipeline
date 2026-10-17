@@ -1,12 +1,14 @@
-import json, re
 from selenium.webdriver.support.ui import WebDriverWait
+import time as _time
 
 
 def extract_product_urls(driver, timeout=15):
-    wait = WebDriverWait(driver, timeout)
+    """
+    Extracts product URLs from the current Flipkart search results page.
+    """
 
     # Wait until product links appear
-    wait.until(
+    WebDriverWait(driver, timeout).until(
         lambda d: d.execute_script("""
             return [...document.querySelectorAll('a[href*="/p/"]')]
                 .some(a => {
@@ -77,13 +79,10 @@ def extract_product_urls(driver, timeout=15):
 
 
 
-
-
-
-
-
-
 def extract_flipkart_product(driver, timeout=20):
+    """
+    Extracts product details from the current Flipkart product page.
+    """
 
     # Wait for page load
     WebDriverWait(driver, timeout).until(
@@ -92,7 +91,6 @@ def extract_flipkart_product(driver, timeout=20):
         """)
     )
 
-    import time as _time
 
     # Scroll smoothly to load lazy sections
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight / 3);")

@@ -1,4 +1,4 @@
-import sys, io, json, requests, time
+import sys, requests, time
 import pandas as pd
 from urllib.parse import urlparse, parse_qs
 from selenium import webdriver
@@ -16,13 +16,10 @@ def run_flipkart_automation(search_query="laptop"):
     Automates Flipkart product search, DOM data extraction, 
     Fast Cart API integration, and Excel data export using Selenium.
     """
-    # Fix terminal encoding to handle Unicode (₹, etc.)
-    if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     
     # 1. Chrome Options & Performance Configuration
     options = Options()
-    # options.add_argument("--headless=new")  # Background mein run karne ke liye uncomment karein
+    # options.add_argument("--headless=new")  # For run in Background uncomment this line
     options.add_argument("--start-maximized")
     options.add_argument("--disable-notifications")
     options.add_argument("--disable-gpu")
@@ -33,8 +30,7 @@ def run_flipkart_automation(search_query="laptop"):
     options.add_experimental_option("prefs", prefs)
 
     print("[INFO] Initializing Google Chrome WebDriver...")
-    service = ChromeService(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
 
     # Data container for assignment execution & export
     product_data = {
@@ -44,7 +40,6 @@ def run_flipkart_automation(search_query="laptop"):
         "Quantity (Qty)": 1,
         "Product Rating": "N/A",
         "Product Details / Specifications": "N/A",
-        # Internal fields for API integration
         "Listing ID": "N/A",
         "Product ID": "N/A",
         "Product URL": "N/A"
@@ -52,9 +47,6 @@ def run_flipkart_automation(search_query="laptop"):
 
     try:
         # --- REQUIREMENT 1: Open Flipkart ---
-        print("\n" + "=" * 65)
-        print(" [STEP 1/6] Open Flipkart Website")
-        print("=" * 65)
         print("[INFO] Navigating to https://www.flipkart.com")
         driver.get("https://www.flipkart.com")
         
@@ -64,14 +56,10 @@ def run_flipkart_automation(search_query="laptop"):
                 EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), '✕')]"))
             )
             close_btn.click()
-            print("[INFO] Closed login popup.")
         except Exception:
-            print("[INFO] No login popup displayed.")
+            pass
 
         # --- REQUIREMENT 2: Search for a Product ---
-        print("\n" + "=" * 65)
-        print(f" [STEP 2/6] Search for Product: '{search_query}'")
-        print("=" * 65)
         search_box = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.NAME, "q"))
         )
@@ -80,9 +68,6 @@ def run_flipkart_automation(search_query="laptop"):
         print(f"[INFO] Search query submitted. Waiting for product results...")
 
         # --- REQUIREMENT 3: Select Product & Extract DOM Info ---
-        print("\n" + "=" * 65)
-        print(" [STEP 3/6] Select Matching Product & Extract Product Information")
-        print("=" * 65)
         products = extract_product_urls(driver)
         if not products:
             raise RuntimeError(f"No matching products found for search query: '{search_query}'")
@@ -129,9 +114,7 @@ def run_flipkart_automation(search_query="laptop"):
         query_params = parse_qs(parsed_url.query)
 
         # --- REQUIREMENT 4: Cart API using current browser session ---
-        print("\n" + "=" * 65)
-        print(" [STEP 4/6] Add Product to Shopping Cart")
-        print("=" * 65)
+        print(" [STEP 4/6] Add Product to Shopping Cart \n\n")
 
         listing_id = product_data.get("Listing ID")
         product_id = product_data.get("Product ID")
@@ -142,8 +125,6 @@ def run_flipkart_automation(search_query="laptop"):
             and product_id and product_id != "N/A"
             and selling_price not in (None, "", "N/A")
         ):
-            print("[INFO] Transferring active browser session to Fast Cart API...")
-
             # Get cookies from the current Selenium browser session
             browser_cookies = driver.get_cookies()
 
@@ -268,10 +249,7 @@ def run_flipkart_automation(search_query="laptop"):
 
 
         # --- REQUIREMENT 5: Checkout & Cart Verification ---
-        print("\n" + "=" * 65)
-        print(" [STEP 5/6] Checkout & Shopping Cart Verification")
-        print("=" * 65)
-        print("[INFO] Navigating to https://www.flipkart.com/viewcart")
+        print(" [STEP 5/6] Checkout & Shopping Cart Verification \n\n")
         driver.get("https://www.flipkart.com/viewcart")
         
         total_amount = None
@@ -362,9 +340,7 @@ def run_flipkart_automation(search_query="laptop"):
         
     finally:
         # --- REQUIREMENT 6: Product Data Extraction & Excel Export ---
-        print("\n" + "=" * 65)
-        print(" [STEP 6/6] Product Data Extraction & Excel Export")
-        print("=" * 65)
+        print(" [STEP 6/6] Product Data Extraction & Excel Export \n\n")
         
         # Save ONLY the 6 required fields
         required_columns = [
