@@ -65,8 +65,10 @@ def run_automation():
 
     # 4. Execute main.py within the virtual environment
     try:
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
         cmd = [str(python_bin), str(MAIN_FILE), search_query]
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, env=env)
     except KeyboardInterrupt:
         print("\n[INFO] Automation stopped by user.")
         sys.exit(0)

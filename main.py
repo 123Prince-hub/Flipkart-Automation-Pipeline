@@ -9,7 +9,16 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-from utils import extract_product_urls, extract_flipkart_product
+from utils import (
+    configure_terminal_encoding,
+    extract_product_urls,
+    extract_flipkart_product,
+    handle_cart_retry,
+    extract_cart_total,
+)
+
+
+configure_terminal_encoding()
 
 def run_flipkart_automation(search_query="laptop"):
     """
@@ -47,7 +56,6 @@ def run_flipkart_automation(search_query="laptop"):
 
     try:
         # --- REQUIREMENT 1: Open Flipkart ---
-        print("[INFO] Navigating to https://www.flipkart.com")
         driver.get("https://www.flipkart.com")
         
         # Handle login popup if it appears
@@ -103,12 +111,6 @@ def run_flipkart_automation(search_query="laptop"):
             print("[WARNING] No specifications could be extracted.")
         product_data["Product Details / Specifications"] = specs_str
 
-        # Display extracted product summary
-        print(f" > Title          : {product_data['Product Name']}")
-        print(f" > Selling Price  : ₹{product_data['Product Price']}")
-        print(f" > Rating         : {product_data['Product Rating']} ★")
-        print(f" > Specifications : {len(specs_dict)} fields extracted")
-
         # Extract Listing ID (lid) from URL for Fast API execution
         parsed_url = urlparse(products_url_data["url"])
         query_params = parse_qs(parsed_url.query)
@@ -132,12 +134,7 @@ def run_flipkart_automation(search_query="laptop"):
             session = requests.Session()
 
             for cookie in browser_cookies:
-                session.cookies.set(
-                    cookie["name"],
-                    cookie["value"],
-                    domain=cookie.get("domain"),
-                    path=cookie.get("path", "/")
-                )
+                session.cookies.set(cookie["name"], cookie["value"], domain=cookie.get("domain"), path=cookie.get("path", "/"))
 
             payload = {
                 "cartContext": {
@@ -175,12 +172,7 @@ def run_flipkart_automation(search_query="laptop"):
 
             try:
                 for attempt in range(1, MAX_RETRIES + 1):
-                    response = session.post(
-                        api_url,
-                        headers=headers,
-                        json=payload,
-                        timeout=30
-                    )
+                    response = session.post(api_url, headers=headers, json=payload, timeout=30)
 
                     try:
                         api_response = response.json()
@@ -215,12 +207,7 @@ def run_flipkart_automation(search_query="laptop"):
                     # Sync updated session cookies back to Selenium browser
                     for c in session.cookies:
                         try:
-                            driver.add_cookie({
-                                "name": c.name,
-                                "value": c.value,
-                                "domain": ".flipkart.com",
-                                "path": "/"
-                            })
+                            driver.add_cookie({"name": c.name, "value": c.value, "domain": ".flipkart.com", "path": "/" })
                         except Exception:
                             try:
                                 driver.add_cookie({"name": c.name, "value": c.value})
@@ -247,83 +234,16 @@ def run_flipkart_automation(search_query="laptop"):
             )
 
 
-
         # --- REQUIREMENT 5: Checkout & Cart Verification ---
         print(" [STEP 5/6] Checkout & Shopping Cart Verification \n\n")
         driver.get("https://www.flipkart.com/viewcart")
         
-        total_amount = None
         time.sleep(3)
 
-        # If temporary retry banner is shown, click Retry
-        try:
-            retried = driver.execute_script("""
-                for (const el of document.querySelectorAll('button, div, span, a')) {
-                    if ((el.innerText || '').trim().toLowerCase() === 'retry') {
-                        el.click();
-                        return true;
-                    }
-                }
-                return false;
-            """)
-            if retried:
-                print("[INFO] Cart retry button was detected and clicked.")
-                time.sleep(2)
-        except Exception as retry_err:
-            print(f"[DEBUG] Cart retry check: {retry_err}")
+        handle_cart_retry(driver)  # If temporary retry banner is shown, click Retry
 
-        for attempt_no in range(1, 6):
-            try:
-                total_amount = driver.execute_script(r"""
-                    // 1. Locate element with text 'Total Amount' and inspect sibling/parent
-                    for (const el of document.querySelectorAll('*')) {
-                        if ((el.innerText || '').trim() === 'Total Amount' && el.children.length === 0) {
-                            const p = el.parentElement;
-                            if (p) {
-                                for (const c of p.children) {
-                                    if (c !== el) {
-                                        const t = (c.innerText || '').trim();
-                                        if (t.includes('₹') || /^[\d,]+$/.test(t)) {
-                                            return t;
-                                        }
-                                    }
-                                }
-                                const m = p.innerText.match(/₹\s*[\d,]+/);
-                                if (m) return m[0];
-                            }
-                        }
-                    }
-
-                    // 2. Parse from Price Details text section
-                    const bodyText = document.body ? document.body.innerText : '';
-                    const match = bodyText.match(/Total Amount\s*\n?\s*(₹\s*[\d,]+)/);
-                    if (match) return match[1].trim();
-
-                    // 3. Fallback CSS selectors
-                    const candidate = document.querySelector('div.CTTtEa, div[class*="CTTtEa"], div._1dqVHU span, div.LAlFNR span, div.iqqSrT');
-                    if (candidate) {
-                        const m = candidate.innerText.match(/Total Amount\s*\n?\s*(₹\s*[\d,]+)/);
-                        if (m) return m[1].trim();
-                    }
-
-                    // 4. Bottom checkout bar next to 'Place Order'
-                    for (const b of document.querySelectorAll('button, a')) {
-                        if ((b.innerText || '').trim().toLowerCase() === 'place order') {
-                            const p = b.parentElement;
-                            if (p) {
-                                const m = p.innerText.match(/₹\s*[\d,]+/);
-                                if (m) return m[0].trim();
-                            }
-                        }
-                    }
-
-                    return null;
-                """)
-                if total_amount:
-                    break
-            except Exception as parse_err:
-                print(f"[DEBUG] Cart total parsing attempt {attempt_no}/5 failed: {parse_err}")
-            time.sleep(1)
+        # Extract the payable Total Amount from the Flipkart Cart (/viewcart) page.
+        total_amount = extract_cart_total(driver, max_attempts=5) 
 
         if total_amount:
             product_data["Total Amount"] = total_amount
@@ -343,14 +263,7 @@ def run_flipkart_automation(search_query="laptop"):
         print(" [STEP 6/6] Product Data Extraction & Excel Export \n\n")
         
         # Save ONLY the 6 required fields
-        required_columns = [
-            "Product Name",
-            "Product Price",
-            "Total Amount",
-            "Quantity (Qty)",
-            "Product Rating",
-            "Product Details / Specifications"
-        ]
+        required_columns = ["Product Name", "Product Price", "Total Amount", "Quantity (Qty)", "Product Rating", "Product Details / Specifications"]
         export_df = pd.DataFrame([{col: product_data.get(col, "N/A") for col in required_columns}])
         excel_filename = "flipkart_product_details.xlsx"
         
@@ -365,18 +278,8 @@ def run_flipkart_automation(search_query="laptop"):
             print(f"[ERROR] Failed to save Excel file: {ex}")
 
         # Final Terminal Summary Card
-        print("\n" + "=" * 65)
         print(" [SUMMARY] Automation Workflow Completed Successfully")
-        print("=" * 65)
-        print(f" 1. Product Name  : {product_data.get('Product Name')}")
-        print(f" 2. Product Price : ₹{product_data.get('Product Price')}")
-        print(f" 3. Total Amount  : {product_data.get('Total Amount')}")
-        print(f" 4. Quantity (Qty): {product_data.get('Quantity (Qty)')}")
-        print(f" 5. Rating        : {product_data.get('Product Rating')} ★")
-        print(f" 6. Excel Output  : {excel_filename}")
-        print("=" * 65 + "\n")
 
-        print("[INFO] Closing browser session...")
         driver.quit()
 
 if __name__ == "__main__":

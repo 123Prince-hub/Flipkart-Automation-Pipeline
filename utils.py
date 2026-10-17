@@ -1,5 +1,16 @@
-from selenium.webdriver.support.ui import WebDriverWait
+import sys as _sys
 import time as _time
+from selenium.webdriver.support.ui import WebDriverWait
+
+
+def configure_terminal_encoding():
+    """
+    Configures terminal stdout and stderr to UTF-8 to safely handle Unicode characters (₹, ★, etc.) on Windows.
+    """
+    if hasattr(_sys.stdout, 'reconfigure'):
+        _sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(_sys.stderr, 'reconfigure'):
+        _sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 
 def extract_product_urls(driver, timeout=15):
@@ -83,7 +94,6 @@ def extract_flipkart_product(driver, timeout=20):
     """
     Extracts product details from the current Flipkart product page.
     """
-
     # Wait for page load
     WebDriverWait(driver, timeout).until(
         lambda d: d.execute_script("""
@@ -305,4 +315,89 @@ def extract_flipkart_product(driver, timeout=20):
 
 
 
+def handle_cart_retry(driver, delay=2):
+    """
+    Checks for a temporary 'Retry' button or banner in Flipkart Cart and clicks it if detected.
+    """
+    try:
+        retried = driver.execute_script("""
+            for (const el of document.querySelectorAll('button, div, span, a')) {
+                if ((el.innerText || '').trim().toLowerCase() === 'retry') {
+                    el.click();
+                    return true;
+                }
+            }
+            return false;
+        """)
+        if retried:
+            print("[INFO] Cart retry button was detected and clicked.")
+            _time.sleep(delay)
+            return True
+        return False
+    except Exception as retry_err:
+        print(f"[DEBUG] Cart retry check: {retry_err}")
+        return False
 
+
+
+
+def extract_cart_total(driver, max_attempts=5, delay=1):
+    """
+    Extracts the payable Total Amount from the Flipkart Cart (/viewcart) page.
+    """
+    for attempt_no in range(1, max_attempts + 1):
+        try:
+            total_amount = driver.execute_script(r"""
+                // 1. Locate element with text 'Total Amount' and inspect sibling/parent
+                for (const el of document.querySelectorAll('*')) {
+                    if ((el.innerText || '').trim() === 'Total Amount' && el.children.length === 0) {
+                        const p = el.parentElement;
+                        if (p) {
+                            for (const c of p.children) {
+                                if (c !== el) {
+                                    const t = (c.innerText || '').trim();
+                                    if (t.includes('₹') || /^[\d,]+$/.test(t)) {
+                                        return t;
+                                    }
+                                }
+                            }
+                            const m = p.innerText.match(/₹\s*[\d,]+/);
+                            if (m) return m[0];
+                        }
+                    }
+                }
+
+                // 2. Parse from Price Details text section
+                const bodyText = document.body ? document.body.innerText : '';
+                const match = bodyText.match(/Total Amount\s*\n?\s*(₹\s*[\d,]+)/);
+                if (match) return match[1].trim();
+
+                // 3. Fallback CSS selectors
+                const candidate = document.querySelector('div.CTTtEa, div[class*="CTTtEa"], div._1dqVHU span, div.LAlFNR span, div.iqqSrT');
+                if (candidate) {
+                    const m = candidate.innerText.match(/Total Amount\s*\n?\s*(₹\s*[\d,]+)/);
+                    if (m) return m[1].trim();
+                }
+
+                // 4. Bottom checkout bar next to 'Place Order'
+                for (const b of document.querySelectorAll('button, a')) {
+                    if ((b.innerText || '').trim().toLowerCase() === 'place order') {
+                        const p = b.parentElement;
+                        if (p) {
+                            const m = p.innerText.match(/₹\s*[\d,]+/);
+                            if (m) return m[0].trim();
+                        }
+                    }
+                }
+
+                return null;
+            """)
+            if total_amount:
+                return total_amount
+        except Exception as parse_err:
+            print(f"[DEBUG] Cart total parsing attempt {attempt_no}/{max_attempts} failed: {parse_err}")
+            
+        if attempt_no < max_attempts:
+            _time.sleep(delay)
+            
+    return None
