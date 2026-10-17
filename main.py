@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from utils import extract_product_urls, extract_flipkart_product
 
-def run_flipkart_automation(search_query):
+def run_flipkart_automation(search_query="laptop"):
     """
     Automates Flipkart product search, DOM data extraction, 
     Fast Cart API integration, and Excel data export using Selenium.

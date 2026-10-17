@@ -45,7 +45,6 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
-flipkart_product_details.xlsx
 rules.md
 *.cover
 *.py.cover
