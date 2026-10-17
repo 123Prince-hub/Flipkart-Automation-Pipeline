@@ -1,164 +1,109 @@
-# Flipkart E-Commerce Automation Pipeline
+# Flipkart Automation Pipeline
 
-A  Python automation framework built with **Selenium WebDriver**, **Requests**, and **Pandas**. It automates searching products on Flipkart, parses deep technical specifications from modern dynamic DOM grids, adds products to the shopping cart via high-speed internal APIs, verifies final checkout pricing on the cart page, and exports structured records into an Excel spreadsheet.
+A robust Python automation framework built with **Selenium WebDriver**, **Requests**, and **Pandas**. It automates product discovery on Flipkart, parses deep technical specifications, adds products to the cart via high-speed internal APIs with smart UI fallback, verifies payable totals on the cart page, and exports structured records into Excel.
 
 ---
 
-## 📌 System Requirements (What is Needed?)
+## 📌 System Requirements
 
-Before running this project, ensure you have:
-1. **Operating System:** Windows 10/11, macOS, or Linux.
-2. **Python:** Python 3.12 or higher installed ([Download Python](https://www.python.org/downloads/)).
-3. **Google Chrome Browser:** Any modern version of Chrome installed (WebDriver is auto-managed).
-4. **Active Internet Connection:** Required to interact with Flipkart in real-time.
+1. **Operating System:** Windows 10/11, macOS, or Linux
+2. **Python:** Python 3.10 or higher installed
+3. **Google Chrome:** Any modern version (ChromeDriver is automatically managed)
+4. **Internet Connection:** Active connection for live Flipkart interaction
 
 ---
 
 ## 🚀 Quick Start (1-Click Run)
 
-You do **NOT** need to manually create virtual environments or install pip packages. The included `run.py` utility manages everything automatically via `subprocess`:
+No manual virtual environment setup or dependency installation is required. `run.py` handles environment creation and package installation automatically:
 
 ```bash
-# 1. Clone or open the project folder
+# 1. Open project directory
 cd Flipkart_Automation
 
-# 2. Run with default product ('laptop')
+# 2. Run with default search query ('laptop')
 python run.py
 
-# 3. Or pass any search keyword directly from the terminal:
+# 3. Or pass any search query directly:
 python run.py mobile
-python run.py "smart watch"
+python run.py watch
 python run.py jeans
-python run.py headphones
+python run.py milk
+python run.py sugar
 ```
-
-> **Note:** If `venv` already exists and dependencies are installed, `run.py` detects this instantly and skips re-installation, launching the automation in under 0.1 seconds.
 
 ---
 
 ## 📋 Assignment Requirements Compliance (`rules.md`)
 
-| Step | Requirement | Status | Engineering Implementation Details |
-| :---: | :--- | :---: | :--- |
-| **1** | **Open Flipkart** | ✅ | Automated via `ChromeDriverManager`. Bypasses bot detection flags and auto-closes login modals. |
-| **2** | **Search for Product** | ✅ | Accepts dynamic query (`laptop`, `mobile`, `jeans`, etc.) with explicit `WebDriverWait` for elements. |
-| **3** | **Select Product** | ✅ | Opens in-stock product, extracts verified Title, Price, Rating, and 20–80+ specifications. |
-| **4** | **Add to Cart** | ✅ | High-speed internal Rome Cart API execution with automatic Datacenter (DC) failover (`HTTP 406`). |
-| **5** | **Checkout Verification** | ✅ | Navigates to `/viewcart` and verifies net payable **Total Amount** (including platform fees and discounts). |
-| **6** | **Excel Export** | ✅ | Saves strictly the required 6 columns to `flipkart_product_details.xlsx` with openpyxl. |
+| Step | Requirement | Implementation Details | Status |
+| :---: | :--- | :--- | :---: |
+| **1** | **Open Flipkart** | Launches Chrome via `webdriver-manager`, bypasses bot detection flags, and auto-dismisses login modals. | ✅ Complete |
+| **2** | **Search for Product** | Searches dynamic keywords (`laptop`, `mobile`, `milk`, etc.) with explicit `WebDriverWait` and fallback locators. | ✅ Complete |
+| **3** | **Select Product** | Prioritizes in-stock listings, navigates to product page, and parses title, price, ratings, and full specifications. | ✅ Complete |
+| **4** | **Add to Cart** | High-speed internal Rome Cart API execution with auto DC failover (`HTTP 406`) + DOM UI button fallback for Grocery/FMCG. | ✅ Complete |
+| **5** | **Checkout Verification** | Navigates to `/viewcart`, handles retry banners, auto-switches grocery tabs if needed, and verifies net payable **Total Amount**. | ✅ Complete |
+| **6** | **Excel Export** | Exports strictly the 6 required fields to `flipkart_product_details.xlsx` with timestamped backup if file is open. | ✅ Complete |
 
 ---
 
-## ⚙️ How the Entire Pipeline Works (Step-by-Step)
+## 🛡️ Key Robustness & Edge-Case Features
 
-```text
-[Terminal / CLI]
-       │
-       ▼
- [run.py Runner] ────► Checks if 'venv' exists & dependencies installed
-       │               (Auto-creates venv & runs pip install ONLY if missing)
-       ▼
- [main.py Pipeline]
-       │
-       ├─► STEP 1: Launch Chrome WebDriver with anti-detection options & navigate to Flipkart
-       │
-       ├─► STEP 2: Enter search query ('laptop', 'mobile', etc.) & wait for result cards
-       │
-       ├─► STEP 3: Prioritize in-stock item, navigate to product page & parse dynamic specifications
-       │
-       ├─► STEP 4: Transfer browser session cookies to Rome Cart API -> Auto-route DC -> Verify cart presence
-       │
-       ├─► STEP 5: Navigate to '/viewcart' & verify final net payable Total Amount (including fees)
-       │
-       └─► STEP 6: Export strictly the 6 required columns to 'flipkart_product_details.xlsx'
-```
-
-### Detailed Breakdown:
-
-1. **Step 1: Open Flipkart & Bot Bypass**
-   - Detects and closes login popups automatically.
-
-2. **Step 2: Dynamic Search Execution**
-   - Locates search bar using explicit waits.
-   - Submits query and monitors search card availability.
-
-3. **Step 3: Deep Data & Specification Extraction (`utils.py`)**
-   - **Smart In-Stock Prioritizer:** Skips "Out of Stock" or "Coming Soon" banners to pick an active buyable product.
-   - **Robust Fallbacks:** Extracts verified ratings from JSON-LD schema or rating badges, and title from `<h1>` if card text is missing.
-
-4. **Step 4: Fast Cart API with Self-Healing DC Routing**
-   - Instead of fragile UI button clicks that break when overlays appear, the engine synchronizes Selenium's session cookies.
-   - Sends payload to Flipkart Cart API.
-   - If Flipkart returns `HTTP 406`, the script extracts the assigned datacenter ID and dynamically re-routes to Flipkart Cart API.
-
-5. **Step 5: Checkout & Cart Total Verification**
-   - Navigates to `https://www.flipkart.com/viewcart`.
-   - Inspects the live `Price Details` container and bottom checkout bar near `Place Order`.
-   - Captures the true net payable **Total Amount** 
-
-6. **Step 6: Resilient Excel Export**
-   - Exports strictly the 6 required fields without polluting internal technical IDs.
-   - Handles file locks gracefully: if Microsoft Excel has `flipkart_product_details.xlsx` locked, it automatically saves to a backup file without crashing.
+- **Multi-Category Resilient:** Fully tested across Electronics (`laptop`, `mobile`), Lifestyle/Fashion (`watch`, `jeans`), and Grocery/FMCG (`milk`, `sugar`).
+- **Hybrid Add-to-Cart Engine:** Executes high-speed internal Rome API by default; seamlessly falls back to browser-level UI click (`add_to_cart_ui_fallback`) if API is restricted.
+- **Dynamic DC Routing:** Automatically handles Flipkart Rome Datacenter shifts (`HTTP 406 + ERROR_CODE 2000`) and redirects requests to the assigned DC.
+- **Terminal Unicode Protection:** Includes `configure_terminal_encoding()` to ensure Indian Rupee symbols (`₹`) and special characters print without `charmap` codec crashes on Windows consoles.
+- **Lock-Safe Excel Export:** If `flipkart_product_details.xlsx` is currently open in Microsoft Excel, it automatically writes to a timestamped backup file to prevent `PermissionError` crashes.
 
 ---
 
 ## 📊 Output Data Schema (`flipkart_product_details.xlsx`)
 
-The generated Excel file strictly contains the exact 6 columns specified in `rules.md`:
+The output spreadsheet strictly exports the exact 6 columns specified in `rules.md`:
 
-| Column Name | Sample Value | Description |
+| Column Name | Type | Description |
 | :--- | :--- | :--- |
-| **Product Name** | `Samsung Galaxy Book4 Metal Intel Core i5 13th Gen...` | Clean product title (without noisy promo text) |
-| **Product Price** | `61990` | Base selling price of the selected product |
-| **Total Amount** | `₹62,296` | Final payable amount verified on the Cart page |
-| **Quantity (Qty)** | `1` | Cart quantity |
-| **Product Rating** | `4.4` | Star rating (from JSON-LD / rating badge) |
-| **Product Details / Specifications** | `Brand: Samsung \| Processor: Core i5 \| RAM: 16 GB...` | Full pipe-delimited specifications string |
+| **Product Name** | Text | Clean product title |
+| **Product Price** | Number | Base selling price of the product |
+| **Total Amount** | Text | Verified net payable amount from Cart page (e.g. `₹70,296`) |
+| **Quantity (Qty)** | Number | Verified cart quantity (`1`) |
+| **Product Rating** | Number | Rating value (e.g. `4.2`) from JSON-LD / rating badge |
+| **Product Details / Specifications** | Text | Pipe-delimited key-value specifications string |
 
 ---
 
-## 💻 Manual Execution Options
+## 💻 Manual Execution (Alternative)
 
-If you prefer to run using standard manual environment activation:
+If you prefer running without the 1-click runner:
 
-### 1. Manual Setup
 ```bash
-# Create virtual environment
+# 1. Create and activate virtual environment
 python -m venv venv
 
-# Activate (Windows)
+# Windows:
 .\venv\Scripts\activate
-
-# Activate (macOS / Linux)
+# macOS / Linux:
 source venv/bin/activate
 
-# Install dependencies
+# 2. Install dependencies
 pip install -r requirements.txt
+
+# 3. Run automation directly
+python main.py "laptop"
+python main.py "mobile"
 ```
-
-### 2. Run Directly
-```bash
-# Run with default 'laptop'
-python main.py
-
-# Run with any category
-python main.py mobile
-python main.py jeans
-python main.py watch
-```
-
 
 ---
 
-## 📁 Repository File Structure
+## 📁 Repository Structure
 
 ```text
 Flipkart_Automation/
-├── run.py                      # 1-Click All-in-One CLI runner (auto-venv, auto-pip & execution)
-├── main.py                     # Main automation script orchestrating the full 6-step workflow
-├── utils.py                    # DOM specification parser, link extractor, & UI helpers
-├── requirements.txt            # Python dependencies (Selenium, Pandas, OpenPyXL, Requests, etc.)
-├── README.md                   # Comprehensive project documentation
+├── run.py                          # 1-Click CLI runner (auto-venv, auto-pip, cross-platform)
+├── main.py                         # Main automation workflow (Steps 1 to 6)
+├── utils.py                        # Modular helper functions (specs, links, retry, cart total)
+├── requirements.txt                # Project dependencies (Selenium, Pandas, OpenPyXL, Requests)
+├── flipkart_product_details.xlsx   # Sample generated output Excel file
+├── README.md                       # Documentation & execution guide
+└── rules.md                        # Original assignment specification
 ```
-
----
