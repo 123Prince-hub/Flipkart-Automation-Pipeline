@@ -107,3 +107,14 @@ Flipkart_Automation/
 ├── README.md                       # Documentation & execution guide
 └── rules.md                        # Original assignment specification
 ```
+
+---
+
+## 👨‍💻 Developer & Author
+
+**Prince Kirad**  
+*Python & Web Automation Engineer*
+
+[![Email](https://img.shields.io/badge/Email-princekirad11%40gmail.com-ea4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:princekirad11@gmail.com)
+
+> *Crafted with clean code, robust exception handling, and real-world resilience.*
