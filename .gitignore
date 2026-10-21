@@ -45,7 +45,6 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
-rules.md
 *.cover
 *.py.cover
 *.lcov

@@ -1,0 +1,72 @@
+{
+  "total_tasks": 5,
+  "successful": 5,
+  "failed": 0,
+  "results": [
+    {
+      "worker_id": 1,
+      "product_keyword": "Samsung mobile",
+      "product_name": "Samsung Galaxy S25 5G Snapdragon (Navy, 128 GB) (12 GB RAM)",
+      "product_price": 58999,
+      "cart_price": 58999,
+      "cart_total": 59298,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 19.49
+    },
+    {
+      "worker_id": 2,
+      "product_keyword": "Wireless headphones",
+      "product_name": "TRIGGR Arcus One 60H Battery, 4 Mic ENC, Dual Pairing,",
+      "product_price": 799,
+      "cart_price": 799,
+      "cart_total": 818,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 19.18
+    },
+    {
+      "worker_id": 3,
+      "product_keyword": "Logitech mouse",
+      "product_name": "Logitech B175 Ambidextrous Optical Mouse with 1000 DPI,",
+      "product_price": 445,
+      "cart_price": 445,
+      "cart_total": 494,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 19.39
+    },
+    {
+      "worker_id": 4,
+      "product_keyword": "Bluetooth speaker",
+      "product_name": "Alexa Echo Dot (5th Gen), Smart speaker with vibrant so",
+      "product_price": 4499,
+      "cart_price": 4499,
+      "cart_total": 4538,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 17.19
+    },
+    {
+      "worker_id": 5,
+      "product_keyword": "Laptop stand",
+      "product_name": "Flipkart SmartBuy 7 Angles Adjustable Foldable Compatib",
+      "product_price": 269,
+      "cart_price": 269,
+      "cart_total": 318,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 18.23
+    }
+  ]
+}

@@ -1,15 +1,30 @@
-# Flipkart Automation Pipeline
+# Flipkart Multithreaded Web Automation Pipeline
 
-A robust Python automation framework built with **Selenium WebDriver**, **Requests**, and **Pandas**. It automates product discovery on Flipkart, parses deep technical specifications, adds products to the cart via high-speed internal APIs with smart UI fallback, verifies payable totals on the cart page, and exports structured records into Excel.
+A high-performance, concurrent Python automation framework built with **Selenium WebDriver**, **ThreadPoolExecutor**, and **Requests**. It executes multiple independent product automation tasks simultaneously, maintains completely isolated browser sessions, transfers authentication cookies into HTTP sessions to verify status codes, validates product cart presence, and consolidates verified data into structured JSON output.
 
 ---
 
-## 📌 System Requirements
+## 📌 Features & Architecture Overview
 
-1. **Operating System:** Windows 10/11, macOS, or Linux
-2. **Python:** Python 3.10 or higher installed
-3. **Google Chrome:** Any modern version (ChromeDriver is automatically managed)
-4. **Internet Connection:** Active connection for live Flipkart interaction
+* **Task 1 — Multithreaded Selenium Concurrency:** Uses Python's `ThreadPoolExecutor` to execute multiple product search and extraction tasks concurrently across independent Google Chrome instances with configurable `max_workers`.
+* **Task 2 — Isolated Session & HTTP Requests:** Extracts live cookies from each worker's Selenium instance, transfers them into an isolated `requests.Session()`, and queries public endpoints to record HTTP status codes (`200 OK`).
+* **Task 3 — Dynamic Cart Automation & Verification:** Performs DOM interaction to add items to cart, navigates to `/viewcart`, verifies product presence, extracts real-time quantity and cart prices, compares product page price vs. cart price, and confirms `SUCCESS`.
+* **Task 4 — Thread Safety & Resource Isolation:** Strict thread isolation where cookies, sessions, and WebDriver instances are never shared. Uses structured worker-level logging (`[Worker-X | Product]`), individual execution timers (`execution_seconds`), and guaranteed `driver.quit()` in `finally` blocks.
+* **Task 5 — Combined JSON Output:** Automatically aggregates all worker results into `multithread_results.json` matching the client-specified schema without fabricated or hardcoded data.
+* **Task 6 — Submission & Visual Concurrency Proof:** Auto-generates `concurrent_execution.png` capturing concurrent browser execution states.
+
+---
+
+## 📋 Client Tasks Compliance Matrix
+
+| Task | Requirement | Implementation Details | Status |
+| :---: | :--- | :--- | :---: |
+| **Task 1** | **Multithreaded Automation** | `ThreadPoolExecutor` with configurable `max_workers` (default 3), independent Chrome instances, search and data extraction. | ✅ Complete |
+| **Task 2** | **Session & HTTP Verification** | Cookies extracted from Selenium, transferred to isolated `requests.Session()`, public endpoint requested, HTTP 200 recorded. | ✅ Complete |
+| **Task 3** | **Cart Automation & Verification** | Selenium UI button click + session sync, `/viewcart` navigation, item match verification, cart price & quantity extraction. | ✅ Complete |
+| **Task 4** | **Thread Management & Error Handling** | Isolated try/finally blocks, crash resilience across workers, worker-identified logging, `time.perf_counter()` timing. | ✅ Complete |
+| **Task 5** | **JSON Output** | Consolidates all worker results into `multithread_results.json` with `total_tasks`, `successful`, `failed`, and metrics. | ✅ Complete |
+| **Task 6** | **Submission Deliverables** | Clean source code, `requirements.txt`, updated `README.md`, sample `multithread_results.json`, and `concurrent_execution.png`. | ✅ Complete |
 
 ---
 
@@ -21,77 +36,107 @@ No manual virtual environment setup or dependency installation is required. `run
 # 1. Open project directory
 cd Flipkart_Automation
 
-# 2. Run with default search query ('laptop')
+# 2. Run with default 3 concurrent workers (Samsung mobile, Wireless headphones, Logitech mouse)
 python run.py
 
-# 3. Or pass any search query directly:
-python run.py mobile
-python run.py watch
-python run.py jeans
-python run.py milk
-python run.py sugar
+# 3. Or pass custom keywords:
+python run.py -k "Samsung mobile" "Bluetooth speaker" "Laptop stand"
+
+# 4. Or configure concurrent worker count:
+python run.py --workers 3
+
+# 5. Run in headless mode:
+python run.py --headless
 ```
 
 ---
 
-## 📋 Assignment Requirements Compliance (`rules.md`)
+## 💻 Direct Manual Execution
 
-| Step | Requirement | Implementation Details | Status |
-| :---: | :--- | :--- | :---: |
-| **1** | **Open Flipkart** | Launches Chrome via `webdriver-manager`, bypasses bot detection flags, and auto-dismisses login modals. | ✅ Complete |
-| **2** | **Search for Product** | Searches dynamic keywords (`laptop`, `mobile`, `milk`, etc.) with explicit `WebDriverWait` and fallback locators. | ✅ Complete |
-| **3** | **Select Product** | Prioritizes in-stock listings, navigates to product page, and parses title, price, ratings, and full specifications. | ✅ Complete |
-| **4** | **Add to Cart** | High-speed internal Rome Cart API execution with auto DC failover (`HTTP 406`) + DOM UI button fallback for Grocery/FMCG. | ✅ Complete |
-| **5** | **Checkout Verification** | Navigates to `/viewcart`, handles retry banners, auto-switches grocery tabs if needed, and verifies net payable **Total Amount**. | ✅ Complete |
-| **6** | **Excel Export** | Exports strictly the 6 required fields to `flipkart_product_details.xlsx` with timestamped backup if file is open. | ✅ Complete |
-
----
-
-## 🛡️ Key Robustness & Edge-Case Features
-
-- **Multi-Category Resilient:** Fully tested across Electronics (`laptop`, `mobile`), Lifestyle/Fashion (`watch`, `jeans`), and Grocery/FMCG (`milk`, `sugar`).
-- **Hybrid Add-to-Cart Engine:** Executes high-speed internal Rome API by default; seamlessly falls back to browser-level UI click (`add_to_cart_ui_fallback`) if API is restricted.
-- **Dynamic DC Routing:** Automatically handles Flipkart Rome Datacenter shifts (`HTTP 406 + ERROR_CODE 2000`) and redirects requests to the assigned DC.
-- **Terminal Unicode Protection:** Includes `configure_terminal_encoding()` to ensure Indian Rupee symbols (`₹`) and special characters print without `charmap` codec crashes on Windows consoles.
-- **Lock-Safe Excel Export:** If `flipkart_product_details.xlsx` is currently open in Microsoft Excel, it automatically writes to a timestamped backup file to prevent `PermissionError` crashes.
-
----
-
-## 📊 Output Data Schema (`flipkart_product_details.xlsx`)
-
-The output spreadsheet strictly exports the exact 6 columns specified in `rules.md`:
-
-| Column Name | Type | Description |
-| :--- | :--- | :--- |
-| **Product Name** | Text | Clean product title |
-| **Product Price** | Number | Base selling price of the product |
-| **Total Amount** | Text | Verified net payable amount from Cart page (e.g. `₹70,296`) |
-| **Quantity (Qty)** | Number | Verified cart quantity (`1`) |
-| **Product Rating** | Number | Rating value (e.g. `4.2`) from JSON-LD / rating badge |
-| **Product Details / Specifications** | Text | Pipe-delimited key-value specifications string |
-
----
-
-## 💻 Manual Execution (Alternative)
-
-If you prefer running without the 1-click runner:
+You can also run `main.py` directly using the virtual environment:
 
 ```bash
-# 1. Create and activate virtual environment
-python -m venv venv
-
+# Activate virtual environment
 # Windows:
 .\venv\Scripts\activate
 # macOS / Linux:
 source venv/bin/activate
 
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Run automation directly
-python main.py "laptop"
-python main.py "mobile"
+# Execute multithreaded automation
+python main.py --workers 3
 ```
+
+### CLI Arguments Reference
+
+| Option | Shorthand | Type | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--workers` | `-w` | Integer | `3` | Number of simultaneous concurrent Chrome browser workers |
+| `--keywords` | `-k` | List | 3 default keywords | Product keywords (space or comma-separated) |
+| `--headless` | | Flag | `False` | Run Chrome instances in background headless mode |
+| `--output` | `-o` | String | `multithread_results.json` | Destination filename for output JSON |
+
+---
+
+## 📊 Sample Output Schema (`multithread_results.json`)
+
+Here is an authentic sample output generated from a live execution of 3 concurrent workers:
+
+```json
+{
+  "total_tasks": 3,
+  "successful": 3,
+  "failed": 0,
+  "results": [
+    {
+      "worker_id": 1,
+      "product_keyword": "Samsung mobile",
+      "product_name": "Samsung Galaxy S25 5G Snapdragon (Navy, 128 GB) (12 GB RAM)",
+      "product_price": 58999,
+      "cart_price": 58999,
+      "cart_total": 59298,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 22.52
+    },
+    {
+      "worker_id": 2,
+      "product_keyword": "Wireless headphones",
+      "product_name": "TRIGGR Arcus One 60H Battery, 4 Mic ENC, Dual Pairing,",
+      "product_price": 799,
+      "cart_price": 799,
+      "cart_total": 818,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 21.8
+    },
+    {
+      "worker_id": 3,
+      "product_keyword": "Logitech mouse",
+      "product_name": "Logitech B175 Ambidextrous Optical Mouse with 1000 DPI,",
+      "product_price": 445,
+      "cart_price": 445,
+      "cart_total": 494,
+      "quantity": 1,
+      "cart_verified": true,
+      "http_status": 200,
+      "status": "SUCCESS",
+      "execution_seconds": 25.72
+    }
+  ]
+}
+```
+
+---
+
+## 📸 Concurrent Browser Execution Proof
+
+The pipeline automatically captures and tiles screenshots from concurrent workers, saved as `concurrent_execution.png`:
+
+![Concurrent Execution Proof](concurrent_execution.png)
 
 ---
 
@@ -99,13 +144,14 @@ python main.py "mobile"
 
 ```text
 Flipkart_Automation/
-├── run.py                          # 1-Click CLI runner (auto-venv, auto-pip, cross-platform)
-├── main.py                         # Main automation workflow (Steps 1 to 6)
-├── utils.py                        # Modular helper functions (specs, links, retry, cart total)
-├── requirements.txt                # Project dependencies (Selenium, Pandas, OpenPyXL, Requests)
-├── flipkart_product_details.xlsx   # Sample generated output Excel file
-├── README.md                       # Documentation & execution guide
-└── rules.md                        # Original assignment specification
+├── run.py                      # 1-Click CLI runner (auto-venv, dependency verification, argument forwarding)
+├── main.py                     # Multithreaded engine (ThreadPoolExecutor, isolated workers, JSON consolidation)
+├── utils.py                    # Modular helper functions (driver factory, cookie transfer, cart verification)
+├── requirements.txt            # Minimal, lightweight dependencies (Selenium, Requests, Webdriver-Manager, Pillow)
+├── multithread_results.json    # Sample JSON output containing 3 live product tasks
+├── concurrent_execution.png    # Live proof image of concurrent browser execution
+├── rules.md                    # Project requirements & task specifications (Tasks 1 to 6)
+└── README.md                   # Complete architectural documentation & execution guide
 ```
 
 ---
@@ -117,4 +163,4 @@ Flipkart_Automation/
 
 [![Email](https://img.shields.io/badge/Email-princekirad11%40gmail.com-ea4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:princekirad11@gmail.com)
 
-> *Crafted with clean code, robust exception handling, and real-world resilience.*
+> *Engineered for high performance, concurrency safety, clean resource isolation, and production-grade reliability.*

@@ -12,6 +12,8 @@ VENV_DIR = BASE_DIR / "venv"
 REQ_FILE = BASE_DIR / "requirements.txt"
 MAIN_FILE = BASE_DIR / "main.py"
 
+
+
 def get_venv_executables():
     """Returns platform-specific paths for Python and Pip in venv."""
     if os.name == "nt":
@@ -22,15 +24,19 @@ def get_venv_executables():
         pip_bin = VENV_DIR / "bin" / "pip"
     return python_bin, pip_bin
 
+
+
 def are_dependencies_installed(python_bin):
     """Checks if the required packages are already installed in the virtual environment."""
     test_cmd = [
         str(python_bin),
         "-c",
-        "import selenium, pandas, openpyxl, requests, webdriver_manager"
+        "import selenium, requests, webdriver_manager"
     ]
     result = subprocess.run(test_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return result.returncode == 0
+
+
 
 def run_automation():
     python_bin, pip_bin = get_venv_executables()
@@ -55,19 +61,15 @@ def run_automation():
     else:
         print("[RUNNER] Dependencies already satisfied. Skipping re-installation.")
 
-    # 3. Read search keyword from CLI arguments or use default
-    if len(sys.argv) > 1:
-        search_query = " ".join(sys.argv[1:])
-    else:
-        search_query = "laptop"
-
-    print(f"\n[RUNNER] Launching Flipkart Automation for: '{search_query}'\n")
+    # 3. Forward CLI arguments to main.py
+    cli_args = sys.argv[1:]
+    print(f"\n[RUNNER] Launching Flipkart Multithreaded Pipeline (Args: {cli_args if cli_args else 'Default Execution'}) \n")
 
     # 4. Execute main.py within the virtual environment
     try:
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
-        cmd = [str(python_bin), str(MAIN_FILE), search_query]
+        cmd = [str(python_bin), str(MAIN_FILE)] + cli_args
         subprocess.run(cmd, check=True, env=env)
     except KeyboardInterrupt:
         print("\n[INFO] Automation stopped by user.")
